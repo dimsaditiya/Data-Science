@@ -1,0 +1,240 @@
+-- Urutan penulisan SQL
+1. select [cloumn_name], [aggregate_function]
+2. from
+3. where
+4. group by
+5. order by
+6. limit
+
+select * from batch_kmb.dimas_users;
+--create tabel
+create table batch_kmb.dimas_users (
+	id int
+	, nama varchar
+	, ktp bigint
+	, birthdate date
+	,gaji float
+)
+
+-- insert data to table
+insert into batch_kmb.dimas_users values
+(1, 'Usep', 132456, '2000-03-03', 9000000),
+(2, 'Nanang Ismail', 662677, '2000-02-03', 120000000)
+
+-- select table 
+select
+*
+from batch_kmb.dimas_users 
+order by 5 desc 
+
+-- update data
+update batch_kmb.dimas_users 
+set ktp = '123456'
+where nama = 'Nanang ismail';
+
+-- add more column
+alter table batch_kmb.dimas_users add address varchar;
+
+-- update data 
+update batch_kmb.dimas_users 
+set address = 'jonggol'
+where nama = 'Nanang ismail';
+
+-- remove column
+alter table batch_kmb.dimas_users drop column nama;
+
+--delete row
+delete from batch_kmb.dimas_users 
+where id >= 2;
+
+-- truncate table hapus isi table
+truncate table batch_kmb.dimas_users;
+
+-- hapus table
+drop table batch_kmb.dimas_users 
+
+-- Menghitung jumlah
+select sum(gaji) as total_gaji
+from batch_kmb.kmb_basic_dimas_aditiya
+
+-- get total sales
+select 
+	sum(sales) as total_sales,
+	sum(quantity) as total_QTY
+from batch_kmb.order_details_csv 
+
+-- get total profit per category
+select
+	category,
+	sum(total_profit) as total_profit_per_category
+from batch_kmb.order_details_csv 
+group by 1
+order by 2 desc
+
+-- what are the unique category & sub-category int the table 
+select distinct 
+	category,
+	sub_category 
+	from batch_kmb.order_details_csv 
+order by 1,2 
+
+-- how many orders?
+select 
+	count(distinct "?order_id") as total_order
+from batch_kmb.order_details_csv
+
+-- Total Profit per Category by largest to lowest
+select 
+	category,
+	sum(total_profit) as total_profit_per_category
+from batch_kmb.order_details_csv
+group by 1
+order by 2 desc 
+
+-- AVG & median profit per order 
+select 
+	avg(total_profit) as avg_profit_per_category,
+	percentile_cont(0.5) within group (order by total_profit) as ql_profir_per_order
+from batch_kmb.order_details_csv
+
+-- TOP 5 sub catergory w/ highest total profit 
+select
+	sub_category,
+	sum(total_profit) as total_profit_per_category
+from batch_kmb.order_details_csv
+group by 1
+order by 2 desc 
+limit 5
+
+-- total Qty sold for furniture
+select 
+	category,
+	sum(quantity) as total_qty_sold
+from batch_kmb.order_details_csv odc 
+where lower(category) like '%Furniture%'
+group by 1
+
+-- get total profit in rupiah
+-- for furniture, cost USD (Times by 14k)
+-- For Office Supplies, kurs poundsterling (times by 15k)
+select 	
+	category,
+	case
+		when category = 'Furniture' then sum(total_profit*14000)
+		when category = 'Office Supplies' then sum(total_profit*19000)
+		when category = 'Technology' then sum(total_profit*5000)
+	end as total_profit_in_rupiah
+from batch_kmb.order_details_csv odc 
+group by 1
+
+--TOP 5 sub catergory w/ highest total profit 
+select
+	sub_category,
+	sum(total_profit) as total_profit_per_category
+from batch_kmb.order_details_csv
+group by 1
+order by 2 desc 
+limit 5
+
+--klasifikasi data
+select 
+	category,
+	sub_category,
+	sum(quantity) as total_quantity_sold,
+	count(distinct 'order_id') as  total_order,
+	avg(total_cost) as avg_total_cost,
+	sum(sales) as total_sales,
+	sum(total_profit) as total_profit
+from batch_kmb.order_details_csv odc 
+group by 1,2
+
+-- TOP 5 sub catergory w/ highest Sales 
+select
+	sub_category,
+	sum(sales) as total_sales
+from batch_kmb.order_details_csv
+group by 1
+order by 2 desc 
+limit 5
+
+--TOP 5 SUB-CATEGORY W/ HIGHEST COST
+select
+	sub_category,
+	AVG(TOTAL_COST) as avg_total_cost
+from batch_kmb.order_details_csv
+group by 1
+order by 2 desc 
+limit 5
+
+-- TOP 3 SUB-CATEGORY W/ LOWEST SALES
+select
+	sub_category,
+	sum(sales) as total_sales
+from batch_kmb.order_details_csv
+group by 1
+order by 2  
+limit 3
+
+-- TOP 3 SUB-CATEGORY W/ LOWEST ORDERS
+select
+	sub_category,
+	count('order_id') as total_order
+from batch_kmb.order_details_csv
+group by 1
+order by 2  
+limit 3
+
+-- what is the most sold category in Germany? (left join)
+select 
+	category,
+	sum (quantity) as total_quantity_in_germany
+	from batch_kmb.order_lists_csv olc 
+	left join batch_kmb.order_details_csv odc 
+		on olc."order" = odc."order"
+where country = 'Germany'
+group by 1
+order by 2 desc 
+
+-- What is the most ship mode for technology category in september 2011 (Penggunaan CTE)
+with
+raw_1 as(
+	select 
+		to_date(order_date, 'MM/DD/YYYY') as date_key,
+		ship_mode,
+		category,
+		quantity
+	from batch_kmb.order_lists_csv olc 
+	left join batch_kmb.order_details_csv odc 
+		on olc."order" = odc."order"
+)
+select 
+	ship_mode,
+	sum(quantity) as total_quantity
+from raw_1
+where category = 'Technology'
+	and date_part('month', date_key) = 9 and date_part('year', date_key) = 2011 
+group by 1
+order by 2 desc;
+
+-- Lates order per each country (2 CTE)
+with 
+raw_1 as(
+	select 
+		"order",
+		to_date(order_date, 'MM/DD/YYYY' ) as date_key,
+		country
+	from batch_kmb.order_lists_csv olc 
+),
+
+raw_2 as (
+	select
+		*,
+		row_number () over(partition by country order by date_key desc) as rn
+	from raw_1
+)
+
+select
+	country,
+	date_key
+from raw_2
+where rn = 1
